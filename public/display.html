@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>شاشة العرض</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#111827">
+<style>
+*{box-sizing:border-box}
+body{font-family:system-ui,sans-serif;background:#0f172a;color:#fff;
+  padding:40px;margin:0;min-height:100vh}
+h1{text-align:center;color:#fbbf24;font-size:38px;margin:0 0 40px}
+#calls{display:grid;grid-template-columns:1fr;gap:20px;max-width:900px;margin:0 auto}
+.call{background:linear-gradient(135deg,#1e293b,#334155);
+  padding:30px 40px;border-radius:20px;display:flex;
+  justify-content:space-between;align-items:center;
+  box-shadow:0 10px 30px rgba(0,0,0,.4);animation:fadeIn .5s}
+.call:first-child{background:linear-gradient(135deg,#1e40af,#2563eb);
+  border:3px solid #fbbf24;transform:scale(1.02)}
+.number{font-size:52px;font-weight:bold;color:#fbbf24}
+.counter{font-size:32px;color:#fff}
+@keyframes fadeIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.empty{text-align:center;color:#64748b;font-size:24px;padding:60px}
+</style>
+</head>
+<body>
+<h1>🔔 النداءات الحالية</h1>
+<div id="calls"><div class="empty">في انتظار النداءات...</div></div>
+
+<script>
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
+
+const tenant = location.pathname.split('/')[2];
+let lastCalledId = null;
+
+async function refresh(){
+  const d = await fetch(`/api/${tenant}/queue`).then(r=>r.json());
+  const box = document.getElementById('calls');
+  if (!d.called.length){
+    box.innerHTML = '<div class="empty">في انتظار النداءات...</div>';
+    return;
+  }
+  box.innerHTML = d.called.map(t=>`
+    <div class="call">
+      <div class="number">${t.prefix}${t.number}</div>
+      <div class="counter">➡️ ${t.counter || ''}</div>
+    </div>`).join('');
+}
+refresh();
+
+const es = new EventSource(`/api/${tenant}/stream`);
+es.addEventListener('ticket_called', e => {
+  const p = JSON.parse(e.data);
+  refresh();
+  speak(p);
+});
+
+function speak(p){
+  if (!('speechSynthesis' in window)) return;
+  // إلغاء أي كلام سابق
+  speechSynthesis.cancel();
+  const text = `تذكرة ${p.ticket.prefix} ${p.ticket.number}، يرجى التوجه إلى ${p.counter}`;
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'ar-SA';
+  u.rate = 0.9;
+  u.volume = 1;
+  u.pitch = 1;
+  speechSynthesis.speak(u);
+}
+
+// تحديث احتياطي كل 10 ثوانٍ
+setInterval(refresh, 10000);
+</script>
+</body>
+</html>
