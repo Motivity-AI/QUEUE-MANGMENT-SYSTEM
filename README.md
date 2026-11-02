@@ -1,2 +1,9 @@
-# QUEUE-MANGMENT-SYSTEM
-QUEUE MANGMENT SYSTEM
+# 🎫 نظام ترتيب الصفوف (SaaS)
+
+نظام عربي متعدد المراكز لإدارة طوابير العملاء مع نداء صوتي وتقارير.
+
+## ⚡ التشغيل السريع (محلياً)
+
+```bash
+npm install
+npm start
