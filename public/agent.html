@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>لوحة الموظف</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:system-ui,sans-serif;padding:24px;background:#f3f4f6;
+  margin:0;min-height:100vh}
+header{background:#1e3a8a;color:#fff;padding:16px 24px;border-radius:12px;
+  display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+header h2{margin:0;font-size:20px}
+.logout{background:#dc2626;color:#fff;border:none;padding:10px 18px;
+  border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit}
+.card{background:#fff;padding:24px;border-radius:12px;margin-bottom:16px;
+  box-shadow:0 1px 3px rgba(0,0,0,.08)}
+label{font-size:15px;color:#374151;margin-left:8px}
+select{padding:10px;border-radius:8px;border:1px solid #d1d5db;
+  font-size:15px;font-family:inherit;min-width:180px}
+#current{background:linear-gradient(135deg,#fbbf24,#f59e0b);
+  color:#000;padding:30px;border-radius:16px;margin:20px 0;
+  font-size:32px;font-weight:bold;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.15)}
+#current.empty{background:#e5e7eb;color:#6b7280;font-size:20px;font-weight:normal}
+button.action{font-size:20px;padding:18px 32px;margin:8px 8px 8px 0;
+  border:none;border-radius:12px;cursor:pointer;font-family:inherit;
+  font-weight:bold;transition:.2s}
+button.call{background:#2563eb;color:#fff}
+button.call:hover{background:#1d4ed8}
+button.serve{background:#16a34a;color:#fff}
+button.serve:hover{background:#15803d}
+button:disabled{opacity:.4;cursor:not-allowed}
+#queue{background:#fff;padding:20px;border-radius:12px;font-size:18px}
+#queue .num{display:inline-block;background:#fef3c7;color:#92400e;
+  padding:6px 14px;border-radius:8px;margin:4px;font-weight:bold}
+#queue .priority{background:#dcfce7;color:#166534}
+</style>
+</head>
+<body>
+<header>
+  <h2>👨‍💼 لوحة الموظف</h2>
+  <button class="logout" onclick="logout()">خروج</button>
+</header>
+
+<div class="card">
+  <label>الكاونتر:</label>
+  <select id="counter"></select>
+</div>
+
+<div id="current" class="empty">لا يوجد عميل حالي</div>
+
+<div>
+  <button class="action call" onclick="callNext()">🔔 نداء التالي</button>
+  <button class="action serve" id="btnServe" onclick="serveCurrent()" disabled>✅ إنهاء الخدمة</button>
+</div>
+
+<div id="queue" style="margin-top:20px">
+  <b>في الانتظار:</b> <span id="waitingList">...</span>
+</div>
+
+<script>
+const token = localStorage.getItem('token');
+if (!token) location.href = '/login';
+const H = { 'Content-Type':'application/json', 'Authorization':'Bearer '+token };
+const tenant = location.pathname.split('/')[2];
+let current = null;
+
+fetch(`/api/${tenant}/counters`).then(r=>r.json()).then(list=>{
+  const sel = document.getElementById('counter');
+  list.forEach(c=>{
+    const o = document.createElement('option');
+    o.value = c.id; o.textContent = c.name;
+    sel.appendChild(o);
+  });
+});
+
+async function refreshQueue(){
+  const q = await fetch(`/api/${tenant}/queue`).then(r=>r.json());
+  document.getElementById('waitingList').innerHTML =
+    q.waiting.length
+      ? q.waiting.map(t=>`<span class="num ${t.priority?'priority':''}">${_urlt.prefix}${t.number}${t.priority?' ⭐':''}</span>`).join('')
+      : '<span style="color:#9ca3af">لا يوجد أحد في الانتظار</span>';
+}
+
+async function callNext(){
+  const cid = document.getElementById('counter').value;
+  if (!cid) return alert('اختر كاونتر أولاً');
+  const q = await fetch(`/api/${tenant}/queue`).then(r=>r.json());
+  const next = q.waiting[0];
+  if (!next) return alert('لا يوجد عملاء في الانتظار');
+  const r = await fetch(`/api/${tenant}/tickets/${next.id}/call`,{
+    method:'POST', headers:H,
+    body:JSON.stringify({counter_id:cid})
+":  });
+  if (!r "/.ok) return alert((await r.json()).errork);
+  current = next.id;
+  const box = document.getElementById('current');
+  box.className = '';
+  box.textContent = `العميل الحالي: ${next.prefix}${next.number}${next.priority?' ⭐':''}`;
+  document.getElementById('btnServe').disabled = false;
+  refreshQueue();
+}
+
+async function serveCurrent(){
+  if (!current) return;
+  await fetch(`/api/${tenant}/tickets/${current}/serve`,{method:'POST',headers:H});
+  current = null;
+  const box = document.getElementById('current');
+  box.className = 'empty';
+  box.textContent = 'لا يوجد عميل حالي';
+  document.getElementById('btnServe').disabled = true;
+  refreshQueue();
+}
+
+function logout(){ localStorage.clear(); location.href='/login'; }
+
+refreshQueue();
+setInterval(refreshQueue, 15000);
+</script>
+</body>
+</html>
