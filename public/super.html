@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>لوحة المزوّد</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:system-ui,sans-serif;background:#f3f4f6;margin:0;padding:24px;color:#111}
+header{background:#1e3a8a;color:#fff;padding:16px 24px;border-radius:12px;
+  display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+header h1{margin:0;font-size:20px}
+button{font-family:inherit;cursor:pointer}
+.logout{background:#dc2626;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:14px}
+.card{background:#fff;padding:20px;border-radius:12px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.card h3{margin-top:0;color:#1e3a8a}
+input{padding:11px;margin:4px 4px 4px 0;border:1px solid #d1d5db;border-radius:8px;font-size:15px;font-family:inherit}
+.act{background:#2563eb;color:#fff;border:none;padding:11px 22px;border-radius:8px;font-size:15px}
+.del{background:#dc2626;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:13px}
+table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden}
+th,td{padding:12px;border-bottom:1px solid #e5e7eb;text-align:right;font-size:14px}
+th{background:#f9fafb;font-weight:600;color:#374151}
+a{color:#2563eb;text-decoration:none}
+a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<header>
+  <h1>🌐 لوحة المزوّد — المراكز</h1>
+  <button class="logout" onclick="logout()">خروج</button>
+</header>
+
+<div class="card">
+  <h3>➕ إنشاء مركز جديد</h3>
+  <input id="slug" placeholder="المعرّف (latin: clinic1)" style="width:200px">
+  <input id="name" placeholder="اسم المركز" style="width:250px">
+  <input id="au" placeholder="اسم مدير المركز" style="width:180px">
+  <input id="ap" type="password" placeholder="كلمة مرور المدير" style="width:180px">
+  <button class="act" onclick="create()">إنشاء</button>
+</div>
+
+<table id="t">
+  <thead>
+    <tr>
+      <th>المركز</th><th>المعرّف</th><th>المستخدمون</th>
+      <th>التذاكر</th><th>روابط</th><th></th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<script>
+const token = localStorage.getItem('token');
+if (!token) location.href = '/login';
+const H = { 'Content-Type':'application/json', 'Authorization':'Bearer '+token };
+
+function logout(){ localStorage.clear(); location.href='/login'; }
+
+async function load(){
+  const list = await fetch('/api/super/tenants',{headers:H}).then(r=>r.json());
+  document.querySelector('#t tbody').innerHTML = list.map(t=>`
+    <tr>
+      <td><b>${t.name}</b></td>
+      <td><code>${t.slug}</code></td>
+      <td>${t.users}</td>
+      <td>${t.tickets}</td>
+      <td>
+        <a href="/kiosk/${t.slug}" target="_blank">كشك</a> ·
+        <a href="/display/${t.slug}" target="_blank">شاشة</a> ·
+        <a href="/agent/${t.slug}" target="_blank">موظف</a>
+      </td>
+      <td><button class="del" onclick="del('${t.id}')">حذف</button></td>
+    </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:#9ca3af">لا توجد مراكز بعد</td></tr>';
+}
+
+async function create(){
+  const r = await fetch('/api/super/tenants',{
+    method:'POST', headers:H,
+    body:JSON.stringify({
+      slug:slug.value.trim(), name:name.value.trim(),
+      admin_username:au.value.trim(), admin_password:ap.value
+    })
+  });
+  const d = await r.json();
+  if (!r.ok) return alert(d.error);
+  slug.value=name.value=au.value=ap.value='';
+  load();
+}
+
+async function del(id){
+  if (!confirm('حذف المركز وكل بياناته نهائياً؟')) return;
+  await fetch('/api/super/tenants/'+id,{method:'DELETE',headers:H});
+  load();
+}
+
+load();
+</script>
+</body>
+</html>
