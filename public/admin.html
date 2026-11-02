@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>لوحة إدارة المركز</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:system-ui,sans-serif;margin:0;background:#f3f4f6;color:#111}
+header{background:#1e3a8a;color:#fff;padding:16px 24px;
+  display:flex;justify-content:space-between;align-items:center}
+header h2{margin:0;font-size:20px}
+nav{background:#fff;padding:10px 24px;display:flex;gap:8px;
+  border-bottom:2px solid #e5e7eb;flex-wrap:wrap}
+nav button{padding:10px 20px;border:none;background:#e5e7eb;border-radius:8px;
+  cursor:pointer;font-size:14px;font-family:inherit;transition:.2s}
+nav button:hover{background:#d1d5db}
+nav button.active{background:#2563eb;color:#fff}
+main{padding:24px;max-width:1100px;margin:0 auto}
+.card{background:#fff;padding:20px;border-radius:12px;margin-bottom:16px;
+  box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.card h3{margin-top:0;color:#1e3a8a}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:20px}
+.stat{background:#fff;padding:20px;border-radius:12px;text-align:center;
+  box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.stat .n{font-size:30px;font-weight:bold;color:#2563eb}
+.stat .l{color:#6b7280;font-size:13px;margin-top:6px}
+table{width:100%;border-collapse:collapse;margin-top:12px}
+th,td{padding:10px;border-bottom:1px solid #e5e7eb;text-align:right;font-size:14px}
+th{background:#f9fafb;color:#374151}
+input,select{padding:10px;border-radius:8px;border:1px solid #d1d5db;
+  font-size:14px;font-family:inherit}
+button.act{background:#2563eb;color:#fff;border:none;padding:10px 20px;
+  border-radius:8px;cursor:pointer;font-size:14px;font-family:inherit}
+button.del{background:#dc2626;color:#fff;border:none;padding:6px 12px;
+  border-radius:6px;cursor:pointer;font-size:13px}
+.row{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.row input,.row select{flex:1;min-width:130px}
+.logout{background:#dc2626;color:#fff;border:none;padding:10px 18px;
+  border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit}
+</style>
+</head>
+<body>
+<header>
+  <h2>🏢 لوحة إدارة المركز</h2>
+  <button class="logout" onclick="logout()">خروج</button>
+</header>
+<nav>
+  <button class="active" onclick="show('overview',this)">الرئيسية</button>
+  <button onclick="show('services',this)">الخدمات</button>
+  <button onclick="show('counters',this)">الكاونترات</button>
+  <button onclick="show('users',this)">المستخدمون</button>
+  <button onclick="show('settings',this)">إعدادات Motivity</button>
+</nav>
+<main id="content"></main>
+
+<script>
+const token = localStorage.getItem('token');
+if (!token) location.href = '/login';
+const H = { 'Content-Type':'application/json', 'Authorization':'Bearer '+token };
+
+function logout(){ localStorage.clear(); location.href='/login'; }
+
+function show(tab, btn){
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const fns = { overview, services, counters, users, settings };
+  fns[tab]?.();
+}
+
+// ==================== Overview ====================
+async function overview(){
+  const s = await fetch('/api/admin/reports/summary',{headers:H}).then(r=>r.json());
+  document.getElementById('content').innerHTML = `
+    <div class="stats">
+      <div class="stat"><div class="n">${s.total}</div><div class="l">تذاكر اليوم</div></div>
+      <div class="stat"><div class="n">${s.served}</div><div class="l">تمت خدمتهم</div></div>
+      <div class="stat"><div class="n">${s.waiting}</div><div class="l">في الانتظار</div></div>
+      <div class="stat"><div class="n">${s.avgWaitMin} د</div><div class="l">متوسط الانتظار</div></div>
+      <div class="stat"><div class="n">${s.avgServeMin} د</div><div class="l">متوسط الخدمة</div></div>
+    </div>
+    <div class="card">
+      <h3>📊 الأداء حسب الخدمة</h3>
+      <table>
+        <tr><th>الخدمة</th><th>الإجمالي</th><th>تمت خدمتهم</th></tr>
+        ${s.byService.map(x=>`<tr><td>${x.service}</td><td>${x.total||0}</td><td>${x.served||0}</td></tr>`).join('') || '<tr><td colspan="3" style="text-align:center;color:#9ca3af">لا توجد بيانات</td></tr>'}
+      </table>
+    </div>
+    <div class="card">
+      <h3>🎯 الأداء حسب الكاونتر</h3>
+      <table>
+        <tr><th>الكاونتر</th><th>تمت خدمتهم اليوم</th></tr>
+        ${s.byCounter.map(x=>`<tr><td>${x.counter}</td><td>${x.served||0}</td></tr>`).join('') || '<tr><td colspan="2" style="text-align:center;color:#9ca3af">لا توجد بيانات</td></tr>'}
+      </table>
+    </div>`;
+}
+
+// ==================== Services ====================
+async function services(){
+  const list = await fetch('/api/admin/services',{headers:H}).then(r=>r.json());
+  document.getElementById('content').innerHTML = `
+    <div class="card">
+      <h3>➕ إضافة خدمة</h3>
+      <div class="row">
+        <input id="sname" placeholder="اسم الخدمة (مثال: خدمة VIP)">
+        <input id="sprefix" placeholder="بادئة التذكرة (V)" style="max-width:140px">
+        <button class="act" onclick="addService()">إضافة</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>📋 الخدمات الحالية</h3>
+      <table>
+        <tr><th>الاسم</th><th>البادئة</th><th></th></tr>
+        ${list.map(s=>`<tr><td>${s.name}</td><td><code>${s.prefix}</code></td>
+          <td><button class="del" onclick="delService('${s.id}')">حذف</button></td></tr>`).join('') || '<tr><td colspan="3" style="text-align:center;color:#9ca3af">لا توجد خدمات</td></tr>'}
+      </table>
+    </div>`;
+}
+async function addService(){
+  const r = await fetch('/api/admin/services',{method:'POST',headers:H,
+    body:JSON.stringify({name:sname.value.trim(),prefix:sprefix.value.trim()})});
+  if (!r.ok) return alert((await r.json()).error);
+  services();
+}
+async function delService(id){
+  if (!confirm('حذف الخدمة؟')) return;
+  await fetch('/api/admin/services/'+id,{method:'DELETE',headers:H});
+  services();
+}
+
+// ==================== Counters ====================
+async function counters(){
+  const [list, svcs] = await Promise.all([
+    fetch('/api/admin/counters',{headers:H}).then(r=>r.json()),
+    fetch('/api/admin/services',{headers:H}).then(r=>r.json())
+  ]);
+  document.getElementById('content').innerHTML = `
+    <div class="card">
+      <h3>➕ إضافة كاونتر</h3>
+      <div class="row">
+        <input id="cname" placeholder="اسم الكاونتر">
+        <select id="csvc">${svcs.map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}</select>
+        <button class="act" onclick="addCounter()">إضافة</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>🪟 الكاونترات الحالية</h3>
+      <table>
+        <tr><th>الاسم</th><th>الخدمة</th><th></th></tr>
+        ${list.map(c=>`<tr><td>${c.name}</td><td>${c.service||'-'}</td>
+          <td><button class="del" onclick="delCounter('${c.id}')">حذف</button></td></tr>`).join('') || '<tr><td colspan="3" style="text-align:center;color:#9ca3af">لا توجد كاونترات</td></tr>'}
+      </table>
+    </div>`;
+}
+async function addCounter(){
+  const r = await fetch('/api/admin/counters',{method:'POST',headers:H,
+    body:JSON.stringify({name:cname.value.trim(),service_id:csvc.value})});
+  if (!r.ok) return alert((await r.json()).error);
+  counters();
+}
+async function delCounter(id){
+  if (!confirm('حذف الكاونتر؟')) return;
+  await fetch('/api/admin/counters/'+id,{method:'DELETE',headers:H});
+  counters();
+}
+
+// ==================== Users ====================
+async function users(){
+  const list = await fetch('/api/admin/users',{headers:H}).then(r=>r.json());
+  document.getElementById('content').innerHTML = `
+    <div class="card">
+      <h3>➕ إضافة مستخدم</h3>
+      <div class="row">
+        <input id="uname" placeholder="اسم المستخدم">
+        <input id="upass" type="password" placeholder="كلمة المرور">
+        <select id="urole">
+          <option value="agent">موظف</option>
+          <option value="tenant_admin">مدير</option>
+        </select>
+        <button class="act" onclick="addUser()">إضافة</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>👥 المستخدمون</h3>
+      <table>
+        <tr><th>الاسم</th><th>الدور</th><th></th></tr>
+        ${list.map(u=>`<tr><td>${u.username}</td>
+          <td>${u.role==='tenant_admin'?'مدير':'موظف'}</td>
+          <td>${u.role!=='tenant_admin'?`<button class="del" onclick="delUser('${u.id}')">حذف</button>`:''}</td>
+        </tr>`).join('')}
+      </table>
+    </div>`;
+}
+async function addUser(){
+  const r = await fetch('/api/admin/users',{method:'POST',headers:H,
+    body:JSON.stringify({username:uname.value.trim(),password:upass.value,role:urole.value})});
+  if (!r.ok) return alert((await r.json()).error);
+  users();
+}
+async function delUser(id){
+  if (!confirm('حذف المستخدم؟')) return;
+  await fetch('/api/admin/users/'+id,{method:'DELETE',headers:H});
+  users();
+}
+
+// ==================== Settings ====================
+async function settings(){
+  const t = await fetch('/api/admin/tenant',{headers:H}).then(r=>r.json());
+  document.getElementById('content').innerHTML = `
+    <div class="card">
+      <h3>⚙️ إعدادات المركز</h3>
+      <div class="row"><input id="tname" value="${t.name||''}" placeholder="اسم المركز"></div>
+      <div class="row"><input id="twh" value="${t.motivity_webhook||''}" placeholder="Motivity Webhook URL (https://...)"></div>
+      <button class="act" onclick="saveSettings()">حفظ</button>
+      <p style="color:#6b7280;font-size:14px;margin-top:16px;line-height:1.7">
+        عند إدخال رابط Webhook الخاص بنظام Motivity، سيتم إرسال حدث <code>queue.call</code>
+        عند كل نداء، ليتم تشغيل الصوت أو الإضاءة تلقائياً عبر منصتهم.
+        <br>لاختبار الرابط: استخدم <code>https://webhook.site</code>.
+      </p>
+    </div>`;
+}
+async function saveSettings(){
+  await fetch('/api/admin/tenant',{method:'PUT',headers:H,
+    body:JSON.stringify({name:tname.value.trim(),motivity_webhook:twh.value.trim()})});
+  alert('تم الحفظ بنجاح ✅');
+}
+
+// ==================== Init ====================
+overview();
+</script>
+</body>
+</html>
