@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>تسجيل الدخول</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:system-ui,sans-serif;background:linear-gradient(135deg,#1e3a8a,#1e40af);
+  display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;padding:20px}
+.box{background:#fff;padding:36px;border-radius:16px;width:100%;max-width:380px;
+  box-shadow:0 20px 40px rgba(0,0,0,.2)}
+h2{margin:0 0 24px;text-align:center;color:#1e3a8a}
+input{width:100%;padding:14px;margin:8px 0;border-radius:10px;border:1px solid #d1d5db;
+  font-size:16px;font-family:inherit}
+button{width:100%;padding:14px;background:#f59e0b;border:none;border-radius:10px;
+  font-size:18px;font-weight:bold;cursor:pointer;margin-top:12px;transition:.2s}
+button:hover{background:#d97706}
+.err{color:#dc2626;font-size:14px;margin-top:12px;text-align:center;min-height:20px}
+</style>
+</head>
+<body>
+<form class="box" onsubmit="return doLogin(event)">
+  <h2>🔐 لوحة الإدارة</h2>
+  <input id="u" placeholder="اسم المستخدم" required autofocus>
+  <input id="p" type="password" placeholder="كلمة المرور" required>
+  <button>دخول</button>
+  <div class="err" id="err"></div>
+</form>
+<script>
+async function doLogin(e){
+  e.preventDefault();
+  const err = document.getElementById('err');
+  err.textContent = '';
+  const r = await fetch('/api/auth/login',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({username:u.value,password:p.value})
+  });
+  const d = await r.json();
+  if (!r.ok){ err.textContent = d.error || 'خطأ'; return false; }
+  localStorage.setItem('token', d.token);
+  localStorage.setItem('role', d.role);
+  localStorage.setItem('tenant', d.tenant_slug || '');
+  if (d.role === 'super_admin')      location.href = '/super.html';
+  else if (d.role === 'tenant_admin') location.href = '/admin.html';
+  else                                location.href = `/agent/${d.tenant_slug}`;
+  return false;
+}
+</script>
+</body>
+</html>
