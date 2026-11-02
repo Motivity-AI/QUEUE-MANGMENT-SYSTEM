@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>كشك التذاكر</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#1e3a8a">
+<style>
+*{box-sizing:border-box}
+body{font-family:system-ui,sans-serif;text-align:center;
+  background:linear-gradient(135deg,#1e3a8a,#1e40af);
+  color:#fff;padding:40px 20px;min-height:100vh;margin:0}
+h1{font-size:42px;margin:0 0 10px}
+.sub{font-size:18px;opacity:.85;margin-bottom:30px}
+#services{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+  gap:20px;max-width:900px;margin:0 auto}
+.svc-group{background:rgba(255,255,255,.1);padding:20px;border-radius:16px;
+  backdrop-filter:blur(10px)}
+.svc-name{font-size:22px;font-weight:bold;margin-bottom:14px}
+button{font-size:20px;padding:18px 24px;border:none;border-radius:12px;
+  cursor:pointer;font-family:inherit;width:100%;margin:6px 0;transition:.2s}
+.btn-normal{background:#f59e0b;color:#000;font-weight:bold}
+.btn-normal:hover{background:#d97706;transform:translateY(-2px)}
+.btn-priority{background:#16a34a;color:#fff;font-size:16px;padding:12px}
+.btn-priority:hover{background:#15803d}
+#ticket{display:none;background:#fff;color:#1e3a8a;
+  padding:50px;border-radius:24px;margin-top:30px;
+  box-shadow:0 20px 60px rgba(0,0,0,.4);max-width:500px;margin-left:auto;margin-right:auto}
+#ticket .num{font-size:96px;font-weight:bold;line-height:1}
+#ticket .lbl{font-size:22px;opacity:.7;margin-bottom:10px}
+#ticket .note{font-size:18px;margin-top:20px;color:#16a34a}
+</style>
+</head>
+<body>
+<h1>مرحباً بكم 👋</h1>
+<div class="sub">اضغط على نوع الخدمة للحصول على تذكرة</div>
+<div id="services"></div>
+<div id="ticket"></div>
+
+<script>
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
+
+const tenant = location.pathname.split('/')[2];
+const el = document.getElementById('ticket');
+
+fetch(`/api/${tenant}/services`).then(r=>r.json()).then(list=>{
+  const box = document.getElementById('services');
+  list.forEach(s=>{
+    const g = document.createElement('div');
+    g.className = 'svc-group';
+    g.innerHTML = `
+      <div class="svc-name">${s.name}</div>
+      <button class="btn-normal" onclick="take('${s.id}', false)">تذكرة عادية</button>
+      <button class="btn-priority" onclick="take('${s.id}', true)">⭐ كبار السن / أولوية</button>`;
+    box.appendChild(g);
+  });
+});
+
+async function take(serviceId, priority){
+  const t = await fetch(`/api/${tenant}/tickets`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({service_id:serviceId, priority})
+  }).then(r=>r.json());
+
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div class="lbl">تذكرتك</div>
+    <div class="num">${t.prefix}${t.number}</div>
+    ${t.priority ? '<div class="note">⭐ أولوية</div>' : ''}
+    <div class="lbl" style="margin-top:20px;font-size:16px">يرجى الانتظار حتى يتم نداء رقمك</div>`;
+  setTimeout(() => { el.style.display = 'none'; }, 10000);
+}
+</script>
+</body>
+</html>
